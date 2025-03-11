@@ -1,81 +1,119 @@
-const http = require('http');
 const WebSocket = require('ws');
-const Message = require('./models/message'); // Assuming you have a Message model
+const mongoose = require('mongoose');
+const Message = require('./models/message');
+const { parse } = require('url');
 
-// Create HTTP server
-const server = http.createServer((req, res) => {
-  res.writeHead(200, { 'Content-Type': 'text/plain' });
-  res.end('WebSocket Server is running');
-});
+const wss = new WebSocket.Server({ port: 4080 });
 
-// Create WebSocket server and bind it to the HTTP server
-const wss = new WebSocket.Server({ server });
+const connectedUsers = new Map();
+const connectedAdminsOrLawyers = new Set();
 
-// Store clients by their userId
-const clients = new Map();
-
-// Handle WebSocket connection
 wss.on('connection', (ws, req) => {
-  console.log("WebSocket connection established");
+    console.log(`🔗 New WebSocket connection: ${req.url}`);
 
-  // Extract userId from the query string
-  const urlParams = new URLSearchParams(req.url.split('?')[1]);
-  const userId = urlParams.get('userId'); // Extract userId from the query parameter
+    // Parse URL query parameters
+    const parsedUrl = parse(req.url, true);
+    const { query } = parsedUrl;
 
-  // If userId is missing, close the connection
-  if (!userId) {
-    ws.close();
-    return;
-  }
+    const userId = query.userId;
+    const userRole = query.role || 'user'; // Default to 'user' if role is missing
 
-  // Store the client using the userId
-  clients.set(userId, ws);
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+        ws.send(JSON.stringify({ error: 'Invalid or missing userId' }));
+        ws.close();
+        return;
+    }
 
-  // When a message is received
-  ws.on('message', async (data) => {
-    const { content, receiverId, propertyId } = JSON.parse(data);
+    connectedUsers.set(userId, ws);
 
-    // Save the message to the database
-    const message = new Message({
-      content,
-      senderId: userId, // Use the actual userId of the sender
-      receiverId,
-      propertyId,
+    if (userRole === 'admin' || userRole === 'lawyer') {
+        connectedAdminsOrLawyers.add(userId);
+        console.log(`👨‍⚖️ Admin/Lawyer connected: ${userId}`);
+    } else {
+        console.log(`👤 User connected: ${userId}`);
+    }
+
+    console.log('📌 Active users:', Array.from(connectedUsers.keys()));
+
+    ws.on('message', async (messageData) => {
+        try {
+            console.log('📩 Received raw message:', messageData);
+
+            let parsedMessage;
+            try {
+                parsedMessage = JSON.parse(messageData);
+            } catch (error) {
+                ws.send(JSON.stringify({ error: 'Invalid JSON format' }));
+                return;
+            }
+
+            let { message, receiverId } = parsedMessage;
+
+            if (!receiverId) {
+                if (connectedAdminsOrLawyers.size > 0) {
+                    receiverId = Array.from(connectedAdminsOrLawyers)[0];
+                    console.log(`🔄 Assigned Admin/Lawyer: ${receiverId}`);
+                } else {
+                    ws.send(JSON.stringify({ error: 'No admin or lawyer available' }));
+                    return;
+                }
+            }
+
+            if (!mongoose.Types.ObjectId.isValid(receiverId)) {
+                ws.send(JSON.stringify({ error: 'Invalid receiverId' }));
+                return;
+            }
+
+            const newMessage = new Message({
+                senderId: new mongoose.Types.ObjectId(userId),
+                receiverId: new mongoose.Types.ObjectId(receiverId),
+                message,
+                timestamp: new Date()
+            });
+
+            await newMessage.save();
+            console.log(`💾 Message saved: From ${userId} to ${receiverId}`);
+
+            const receiverSocket = connectedUsers.get(receiverId);
+
+            console.log(`📡 Checking receiver (${receiverId}):`, receiverSocket ? 'Connected' : 'Not Connected');
+
+            if (receiverSocket && receiverSocket.readyState === WebSocket.OPEN) {
+                receiverSocket.send(JSON.stringify({
+                    senderId: userId,
+                    message,
+                    timestamp: newMessage.timestamp
+                }));
+                console.log(`📤 Message sent to receiver (${receiverId})`);
+            } else {
+                console.log(`⚠️ Receiver ${receiverId} not online.`);
+            }
+
+            if (ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    senderId: userId,
+                    message,
+                    timestamp: newMessage.timestamp,
+                    selfMessage: true
+                }));
+            }
+
+        } catch (error) {
+            console.error('❌ Error processing message:', error);
+            ws.send(JSON.stringify({ error: 'Error processing message' }));
+        }
     });
 
-    await message.save();
+    ws.on('close', () => {
+        console.log(`❌ User disconnected: ${userId}`);
+        connectedUsers.delete(userId);
+        connectedAdminsOrLawyers.delete(userId);
+    });
 
-    // If the receiver is online, send the message to them
-    if (clients.has(receiverId)) {
-      clients.get(receiverId).send(JSON.stringify({
-        content,
-        senderId: userId,  // Dynamic senderId
-        propertyId,
-      }));
-    }
-  });
+    ws.on('error', (err) => {
+        console.error(`⚠️ WebSocket error for user ${userId}:`, err);
+    });
 
-  // Handle connection close
-  ws.on('close', () => {
-    clients.delete(userId);  // Remove client by userId when they disconnect
-  });
-
-  // Handle WebSocket errors
-  ws.on('error', (err) => {
-    console.error('WebSocket error:', err);
-  });
 });
 
-// Handle upgrade request (WebSocket handshake)
-server.on('upgrade', (req, socket, head) => {
-  wss.handleUpgrade(req, socket, head, (ws) => {
-    wss.emit('connection', ws, req);
-  });
-});
-
-// Start the HTTP server
-server.listen(4070, () => {
-  console.log('Server is listening on port 4070');
-});
-
-module.exports = { wss, server };
+console.log('🚀 WebSocket server running on ws://localhost:4080');

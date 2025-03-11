@@ -2,7 +2,8 @@ const mongoose = require("mongoose");
 
 const LawyerSchema = new mongoose.Schema({
   fullname: { type: String, required: true },
-  email: { type: String, required: true, unique: true },
+  email: { type: String, unique: true, required: true },
+  phone: { type: String, unique: true, required: true }, // Added phone number
   password: { type: String, required: true },
   status: {
     type: String,

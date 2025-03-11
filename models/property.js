@@ -4,7 +4,7 @@ const PropertySchema = new mongoose.Schema(
   {
     title: { type: String, required: true },
     price: { type: Number, required: true },
-    seller: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    seller: { type: mongoose.Schema.Types.ObjectId, ref: "User",},
     address: { type: String, required: true }, 
     description: { type: String, default: "" },
     status: { type: String, enum: ["pending", "verified", "rejected"], default: "pending" },

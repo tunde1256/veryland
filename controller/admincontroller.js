@@ -30,37 +30,10 @@ exports.createLawyerRequest = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
-const Lawyer = require("../models/lawyer");
-
-exports.approveLawyer = async (req, res) => {
-  const { lawyerId, decision } = req.body; // decision can be 'approve' or 'reject'
-
-  try {
-    const lawyer = await Lawyer.findById(lawyerId);
-    if (!lawyer) {
-      return res.status(404).json({ message: "Lawyer not found" });
-    }
-
-    if (decision === 'approve') {
-      lawyer.status = 'approved';
-    } else if (decision === 'reject') {
-      lawyer.status = 'rejected';
-    } else {
-      return res.status(400).json({ message: "Invalid decision" });
-    }
-
-    await lawyer.save();
-
-    res.status(200).json({ message: `Lawyer ${decision}d successfully`, lawyer });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
 
 exports.approveOrRejectLawyer = async (req, res) => {
   try {
-    const { lawyerId, action } = req.body; // action can be 'approve' or 'reject'
+    const { lawyerId, action } = req.body; 
 
     const lawyer = await Lawyer.findById(lawyerId);
     if (!lawyer) {
@@ -85,6 +58,56 @@ exports.approveOrRejectLawyer = async (req, res) => {
     await lawyer.save();
     res.status(200).json({ message: `Lawyer request ${action}d successfully`, lawyer });
   } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+const axios = require("axios");
+
+exports.downloadDocument = async (req, res) => {
+  try {
+    const { propertyId, documentIndex } = req.params;
+    const userRole = req.user.role; // Get role from JWT (lawyer or admin)
+    
+    // Check if user is allowed to download
+    if (!["admin", "lawyer"].includes(userRole)) {
+      return res.status(403).json({ message: "You do not have permission to download this document" });
+    }
+
+    // Find the property by ID
+    const property = await Property.findById(propertyId);
+    if (!property) {
+      return res.status(404).json({ message: "Property not found" });
+    }
+
+    // Ensure the document exists at the specified index
+    const document = property.documents[documentIndex];
+    if (!document) {
+      return res.status(404).json({ message: "Document not found at the specified index" });
+    }
+
+    console.log("Found document:", document); // Log to inspect the document object
+
+    // Check if the document has the filePath (Cloudinary URL)
+    if (!document.filePath) {
+      return res.status(404).json({ message: "Document file path is missing" });
+    }
+
+    // Fetch the document from Cloudinary and stream it to the client
+    const response = await axios({
+      method: "get",
+      url: document.filePath,  // Directly using `filePath` instead of `encryptedFilePath`
+      responseType: "stream",
+    });
+
+    // Set headers to trigger file download on the client side
+    res.setHeader("Content-Disposition", `attachment; filename="${document.name}"`);
+    res.setHeader("Content-Type", response.headers["content-type"]); // Set content type dynamically
+
+    // Pipe the file stream from Cloudinary to the client
+    response.data.pipe(res);
+
+  } catch (error) {
+    console.error("Error downloading document:", error);
     res.status(500).json({ message: error.message });
   }
 };

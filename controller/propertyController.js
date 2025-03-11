@@ -1,5 +1,9 @@
 const Property = require("../models/property");
 const opencage = require("opencage-api-client");
+const { encryptDocument, decryptDocument } = require('../utils/encryptionUtils'); // Import the encryption functions
+const fs = require('fs');
+const Notification = require("../models/Notification"); // Import Notification model
+
 
 const OPENCAGE_API_KEY = process.env.OPENCAGE_API_KEY || "46e202a2c1f64c8d84a6deb9b375e9ef";
 
@@ -22,6 +26,27 @@ exports.getPropertyDetails = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+exports.getRandomProperties = async (req, res) => {
+  try {
+    const randomProperties = await Property.aggregate([
+      { $sample: { size: 10 } } // Adjust the size if you want more or fewer random properties
+    ]);
+
+    if (randomProperties.length === 0) {
+      return res.status(404).json({ message: "No properties found" });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Random properties retrieved successfully",
+      data: randomProperties,
+    });
+  } catch (error) {
+    console.error("Error retrieving random properties:", error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
 
 exports.deleteProperty = async (req, res) => {
   try {
@@ -35,78 +60,95 @@ exports.deleteProperty = async (req, res) => {
 
 
 exports.listProperty = async (req, res) => {
-    try {
-      // Validate that both images and documents are uploaded
-      if (!req.files || req.files.length === 0) {
-        return res.status(400).json({ error: "At least one image or document is required" });
-      }
-  
-      // Extract the seller from the URL params
-      const { seller } = req.params;
-  
-      // Extract the other fields from the request body
-      const { title, address, price, description } = req.body;
-  
-      // Validate that all required fields are present
-      if (!title || !address || !price || !seller) {
-        return res.status(400).json({ error: "All fields (title, address, price, seller) are required" });
-      }
-  
-      // Separate images and documents from req.files (cloudinary will store both types)
-      const images = req.files.filter((file) => file.mimetype.startsWith("image"));
-      const documents = req.files.filter((file) => file.mimetype === "application/pdf" || file.mimetype === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || file.mimetype === "text/plain");
-  
-      // Ensure that at least one image is uploaded
-      if (images.length === 0) {
-        return res.status(400).json({ error: "At least one image of the property is required" });
-      }
-  
-      // Collect the image URLs and document URLs
-      const imageUrls = images.map((file) => file.path);
-      const documentUrls = documents.map((file) => file.path);
-  
-      // Use OpenCage API to get geo-coordinates from the address
-      const geoData = await opencage.geocode({ q: address, key: OPENCAGE_API_KEY });
-  
-      if (!geoData.results || geoData.results.length === 0) {
-        return res.status(400).json({ error: "Invalid address, unable to retrieve geolocation" });
-      }
-  
-      const { lat, lng } = geoData.results[0].geometry;
-  
-      // Create the property document in the database
-      const newProperty = new Property({
-        title,
-        price,
-        seller,
-        address,
-        description: description || "", // Optional description
-        location: {
-          type: "Point",
-          coordinates: [lng, lat], // MongoDB GeoJSON format
-        },
-        images: imageUrls, // Save image URLs
-        documents: documentUrls, // Save document URLs
-      });
-  
-      await newProperty.save();
-  
-      return res.status(201).json({
-        success: true,
-        message: "Property created successfully",
-        data: newProperty,
-      });
-    } catch (error) {
-      console.error("Error creating property:", error);
-  
-      // Handle errors
-      if (error.name === "ValidationError") {
-        return res.status(400).json({ error: error.message });
-      }
-  
-      return res.status(500).json({ error: "An unexpected error occurred. Please try again later." });
+  try {
+    console.log("Files in req.files:", JSON.stringify(req.files, null, 2));
+
+    if (!req.files || (!req.files.images && !req.files.documents)) {
+      return res.status(400).json({ error: "At least one image or document is required" });
     }
-  };
+
+    const images = req.files.images || [];
+    const documents = req.files.documents || [];
+
+    if (images.length === 0) {
+      return res.status(400).json({ error: "At least one image of the property is required" });
+    }
+
+    const uploadedDocuments = documents.map(doc => doc.path);
+    console.log("Uploaded documents:", JSON.stringify(uploadedDocuments, null, 2));
+
+    const uploadedImages = images.map(image => image.path);
+    console.log("Uploaded images:", JSON.stringify(uploadedImages, null, 2));
+
+    const geoData = await opencage.geocode({ q: req.body.address, key: OPENCAGE_API_KEY });
+    if (!geoData.results || geoData.results.length === 0) {
+      return res.status(400).json({ error: "Invalid address, unable to retrieve geolocation" });
+    }
+    const { lat, lng } = geoData.results[0].geometry;
+
+    const newProperty = new Property({
+      title: req.body.title,
+      price: req.body.price,
+      seller: req.params.sellerId,
+      address: req.body.address,
+      description: req.body.description || "",
+      location: { type: "Point", coordinates: [lng, lat] },
+      images: uploadedImages,
+      documents: uploadedDocuments,
+    });
+
+    await newProperty.save();
+
+    // Send a notification to the seller
+    await createNotification(req.params.sellerId, `Your property "${req.body.title}" has been listed successfully!`, "success");
+
+    return res.status(201).json({
+      success: true,
+      message: "Property created successfully",
+      data: newProperty,
+    });
+
+  } catch (error) {
+    console.error("Error creating property:", error);
+    const errorMessage = error.message || JSON.stringify(error);
+    console.log("Error details:", errorMessage);
+
+    return res.status(500).json({
+      error: errorMessage,
+    });
+  }
+};
+
+
+
+
+exports.decryptDocument = async (req, res) => {
+  try {
+    const { documentId, secretKey } = req.body; // The document ID and secret key to decrypt the document
+
+    const property = await Property.findById(documentId);
+    if (!property) {
+      return res.status(404).json({ error: "Property not found" });
+    }
+
+    const document = property.documents[0]; // Assuming you're accessing the first document
+    const { encryptedFilePath, iv } = document; // Get encrypted file path and IV
+
+    // Decrypt the document
+    const decryptedFilePath = await decryptDocument(encryptedFilePath, secretKey, iv);
+
+    // Send back the decrypted file path for download
+    res.download(decryptedFilePath, (err) => {
+      if (err) {
+        res.status(500).json({ error: "Failed to download the decrypted document" });
+      }
+    });
+  } catch (error) {
+    console.error("Error decrypting document:", error);
+    res.status(500).json({ error: "An error occurred while decrypting the document" });
+  }
+};
+
   
   
 

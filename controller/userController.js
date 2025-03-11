@@ -94,8 +94,8 @@ exports.forgotPassword = async (req, res) => {
     }
 
     // Generate a reset token
-    const resetToken = crypto.randomBytes(20).toString('hex');
-    
+    const resetToken = crypto.randomBytes(20).toString("hex");
+
     // Set token and expiration time
     user.resetPasswordToken = resetToken;
     user.resetPasswordExpires = Date.now() + 3600000; // Token expires in 1 hour
@@ -104,18 +104,39 @@ exports.forgotPassword = async (req, res) => {
 
     // Send the reset email
     const transporter = nodemailer.createTransport({
-      service: "gmail", 
+      service: "gmail",
       auth: {
-        user: process.env.EMAIL_USER,  
-        pass: process.env.EMAIL_PASS,  
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
       },
     });
 
     const mailOptions = {
       from: process.env.EMAIL_USER,
       to: user.email,
-      subject: "Password Reset Request",
-      text: `Hello ${user.fullname},\n\nWe received a request to reset your password. Please use the following link to reset your password:\n\n${process.env.FRONTEND_URL}/reset-password/${resetToken}\n\nIf you didn't request a password reset, please ignore this email.\n\nBest regards,\nVeryLand Team`,
+      subject: "PlotXpert - Password Reset Request",
+      html: `
+        <p>Hello <strong>${user.fullname}</strong>,</p>
+        
+        <p>We received a request to reset your password for your PlotXpert account. Please click the button below to reset your password:</p>
+        
+        <p style="text-align: center;">
+          <a href="${process.env.FRONTEND_URL}/reset-password/${resetToken}" 
+             style="display: inline-block; padding: 10px 20px; font-size: 16px; color: #fff; background-color: #007bff; text-decoration: none; border-radius: 5px;">
+             Reset Password
+          </a>
+        </p>
+        
+        <p>If the button above does not work, you can also copy and paste this link into your browser:</p>
+        <p>${process.env.FRONTEND_URL}/reset-password/${resetToken}</p>
+        
+        <p><strong>Note:</strong> This link is valid for only 1 hour. If you did not request a password reset, please ignore this email.</p>
+        
+        <p>For any assistance, please contact our support team at <a href="mailto:${process.env.SUPPORT_EMAIL}">${process.env.SUPPORT_EMAIL}</a>.</p>
+        
+        <p>Best regards,</p>
+        <p><strong>The PlotXpert Team</strong></p>
+      `,
     };
 
     transporter.sendMail(mailOptions, (err, info) => {
@@ -124,13 +145,16 @@ exports.forgotPassword = async (req, res) => {
         return res.status(500).json({ message: "Error sending email" });
       } else {
         console.log("Email sent:", info.response);
-        return res.status(200).json({ message: "Password reset link has been sent to your email" });
+        return res
+          .status(200)
+          .json({ message: "Password reset link has been sent to your email" });
       }
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
+
 exports.resetPassword = async (req, res) => {
   try {
     const { resetToken, newPassword } = req.body;
@@ -154,6 +178,41 @@ exports.resetPassword = async (req, res) => {
     user.resetPasswordExpires = undefined;
 
     await user.save();
+
+    // Send confirmation email
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: user.email,
+      subject: "PlotXpert - Password Reset Successful",
+      html: `
+        <p>Hello <strong>${user.fullname}</strong>,</p>
+        
+        <p>Your password has been successfully reset.</p>
+        
+        <p>If you did not request this change, please contact our support team immediately at <a href="mailto:${process.env.SUPPORT_EMAIL}">${process.env.SUPPORT_EMAIL}</a>.</p>
+        
+        <p>For security reasons, please do not share your login credentials with anyone.</p>
+        
+        <p>Best regards,</p>
+        <p><strong>The PlotXpert Team</strong></p>
+      `,
+    };
+
+    transporter.sendMail(mailOptions, (err, info) => {
+      if (err) {
+        console.error("Error sending confirmation email:", err);
+      } else {
+        console.log("Confirmation email sent:", info.response);
+      }
+    });
 
     res.status(200).json({ message: "Password has been reset successfully" });
   } catch (error) {

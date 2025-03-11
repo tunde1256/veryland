@@ -7,4 +7,10 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
+// Make sure to set public access mode while uploading
+cloudinary.uploader.upload = async (path, options) => {
+  options = { ...options, access_mode: 'public' };  // Make uploaded files publicly accessible
+  return cloudinary.uploader.upload(path, options);
+};
+
 module.exports = cloudinary;

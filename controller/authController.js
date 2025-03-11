@@ -3,7 +3,6 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const nodemailer = require("nodemailer");
 
-
 exports.register = async (req, res) => {
   try {
     const { fullname, email, password, role, phone, address } = req.body;
@@ -44,19 +43,27 @@ exports.register = async (req, res) => {
 
     await newUser.save();
 
+    // Send Welcome Email
     const transporter = nodemailer.createTransport({
-      service: "gmail", 
+      service: "gmail",
       auth: {
-        user: process.env.EMAIL_USER,  
-        pass: process.env.EMAIL_PASS,  
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
       },
     });
 
     const mailOptions = {
-      from: process.env.EMAIL_USER,  
-      to: newUser.email,  
-      subject: "Welcome to VeryLand",  
-      text: `Hello ${newUser.fullname},\n\nThank you for registering at VeryLand! Your account has been created successfully. You can now explore the platform.\n\nBest regards,\nVeryLand Team`,  // Plain text body
+      from: process.env.EMAIL_USER,
+      to: newUser.email,
+      subject: "Welcome to PlotXpert!",
+      html: `
+        <h2>Welcome to PlotXpert, ${newUser.fullname}!</h2>
+        <p>We're excited to have you on board. Your account has been successfully created.</p>
+        <p>With PlotXpert, you can explore, analyze, and manage geospatial data effortlessly.</p>
+        <p>Start exploring today and make the most out of PlotXpert!</p>
+        <p>Best regards,</p>
+        <p><strong>PlotXpert Team</strong></p>
+      `,
     };
 
     transporter.sendMail(mailOptions, (err, info) => {
@@ -68,7 +75,7 @@ exports.register = async (req, res) => {
     });
 
     res.status(201).json({
-      message: "User registered successfully",
+      message: "User registered successfully. A confirmation email has been sent.",
       user: {
         id: newUser._id,
         fullname: newUser.fullname,
@@ -82,6 +89,7 @@ exports.register = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
 
 
 

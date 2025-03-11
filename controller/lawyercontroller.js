@@ -4,6 +4,9 @@ const Lawyer = require("../models/lawyer");
 const Property = require("../models/property");
 const Verification = require("../models/Verification");
 const nodemailer = require("nodemailer");
+const { decryptDocument } = require('../utils/encryptionUtils');
+const axios = require("axios");
+
 
 exports.registerLawyer = async (req, res) => {
     const { fullname, email, password, phone } = req.body;
@@ -38,10 +41,27 @@ exports.registerLawyer = async (req, res) => {
       const mailOptions = {
         from: process.env.EMAIL_USER,
         to: newLawyer.email,
-        subject: 'Lawyer Registration Pending Approval',
-        text: `Dear ${newLawyer.fullname},\n\nYour registration is currently pending approval by the admin. You will be notified once your account is approved.\n\nThank you.`,
+        subject: 'Welcome to PlotXpert - Registration Pending Approval',
+        text: `Dear ${newLawyer.fullname},
+
+Welcome to PlotXpert! 
+
+We have received your registration request, and your account is currently under review. Our admin team will verify your details, and you will receive an approval notification once your account has been activated.
+
+What happens next?
+- Your account is being reviewed to ensure compliance with our legal service policies.
+- Approval typically takes 24-48 hours. 
+- Once approved, you will gain full access to our platform.
+
+Need Assistance?
+If you have any questions, feel free to reach out to our support team at ${process.env.SUPPORT_EMAIL}.
+
+Thank you for joining PlotXpert!
+
+Best regards,  
+The PlotXpert Team
+        `,
       };
-       
   
       transporter.sendMail(mailOptions, (err, info) => {
         if (err) {
@@ -54,11 +74,13 @@ exports.registerLawyer = async (req, res) => {
       // Return success response
       res.status(201).json({
         newLawyer,
-     message: "Lawyer registered successfully. Pending approval." });
+        message: "Lawyer registered successfully. Pending approval."
+      });
     } catch (error) {
       res.status(500).json({ message: error.message });
     }
   };
+
 exports.loginLawyer = async (req, res) => {
   const { email, password } = req.body;
 
@@ -80,32 +102,62 @@ exports.loginLawyer = async (req, res) => {
   }
 };
 
-// Lawyer downloads document
+
+
+
 exports.downloadDocument = async (req, res) => {
-    try {
-      const { propertyId, documentIndex } = req.params;
-      
-      // Get the authenticated user's role
-      const userRole = req.user.role; // This should be available from JWT
-  
-      // Check if the user is a lawyer or admin
-      if (!["admin", "lawyer"].includes(userRole)) {
-        return res.status(403).json({ message: "You do not have permission to download this document" });
-      }
-  
-      // Find the property by ID
-      const property = await Property.findById(propertyId);
-      if (!property || !property.documents[documentIndex]) {
-        return res.status(404).json({ message: "Document not found" });
-      }
-  
-      // Redirect to the document URL for download
-      res.redirect(property.documents[documentIndex]);
-    } catch (error) {
-      res.status(500).json({ message: error.message });
+  try {
+    const { propertyId, documentIndex } = req.params;
+    const userRole = req.user.role; // Get role from JWT (lawyer or admin)
+    
+    // Check if user is allowed to download
+    if (!["admin", "lawyer"].includes(userRole)) {
+      return res.status(403).json({ message: "You do not have permission to download this document" });
     }
-  };
-  
+
+    // Find the property by ID
+    const property = await Property.findById(propertyId);
+    if (!property) {
+      return res.status(404).json({ message: "Property not found" });
+    }
+
+    // Ensure the document exists at the specified index
+    const document = property.documents[documentIndex];
+    if (!document) {
+      return res.status(404).json({ message: "Document not found at the specified index" });
+    }
+
+    console.log("Found document:", document); // Log to inspect the document object
+
+    // Check if the document has the filePath (Cloudinary URL)
+    if (!document.filePath) {
+      return res.status(404).json({ message: "Document file path is missing" });
+    }
+
+    // Fetch the document from Cloudinary and stream it to the client
+    const response = await axios({
+      method: "get",
+      url: document.filePath,  // Directly using `filePath` instead of `encryptedFilePath`
+      responseType: "stream",
+    });
+
+    // Set headers to trigger file download on the client side
+    res.setHeader("Content-Disposition", `attachment; filename="${document.name}"`);
+    res.setHeader("Content-Type", response.headers["content-type"]); // Set content type dynamically
+
+    // Pipe the file stream from Cloudinary to the client
+    response.data.pipe(res);
+
+  } catch (error) {
+    console.error("Error downloading document:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+
+
+
+
 
 exports.giveConsent = async (req, res) => {
   const { propertyId, decision } = req.body; 
