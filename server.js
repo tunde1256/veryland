@@ -12,9 +12,19 @@ db();
 
 const app = express();
 
+// Define CORS options (Allow any origin)
+const corsOptions = {
+  origin: '*',  // Allow any origin (including any port)
+  methods: ['GET', 'POST'],  // Specify allowed methods
+  allowedHeaders: ['Content-Type', 'Authorization'],  // Specify allowed headers
+  credentials: true,  // Allow cookies and other credentials
+};
+
+// Use CORS middleware with options
+app.use(cors(corsOptions));
+
 // Middleware
 app.use(express.json());
-app.use(cors());
 
 // Routes
 const authRoutes = require("./routes/auth");
