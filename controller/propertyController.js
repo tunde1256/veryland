@@ -2,7 +2,7 @@ const Property = require("../models/property");
 const opencage = require("opencage-api-client");
 const { encryptDocument, decryptDocument } = require('../utils/encryptionUtils'); // Import the encryption functions
 const fs = require('fs');
-const Notification = require("../models/Notification"); // Import Notification model
+const { createNotification } = require("../controller/notificationService");
 
 
 const OPENCAGE_API_KEY = process.env.OPENCAGE_API_KEY || "46e202a2c1f64c8d84a6deb9b375e9ef";

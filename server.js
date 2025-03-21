@@ -6,6 +6,7 @@ const { WebSocketServer } = require("ws");
 const mongoose = require("mongoose");
 const Message = require("./models/message");
 const db = require("./config/db");
+const stripeRoutes = require('./routes/stripeRoutes');
 
 // Connect to MongoDB
 db();
@@ -40,6 +41,7 @@ app.use("/api/properties", propertyRoutes);
 app.use("/api/verification", verificationRoutes);
 app.use("/api/lawyers", lawyerRoutes);
 app.use("/api/admin", adminRoutes);
+app.use('/api/stripe', stripeRoutes);
 
 // Create HTTP server and attach Express app
 const server = http.createServer(app);

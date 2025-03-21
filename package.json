@@ -26,6 +26,7 @@
     "node-cron": "^3.0.3",
     "nodemailer": "^6.10.0",
     "opencage-api-client": "^1.0.7",
+    "stripe": "^17.7.0",
     "ws": "^8.18.1"
   }
 }
