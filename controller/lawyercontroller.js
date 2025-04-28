@@ -9,48 +9,68 @@ const axios = require("axios");
 
 
 exports.registerLawyer = async (req, res) => {
-    const { fullname, email, password, phone } = req.body;
-  
-    try {
-      const existingLawyer = await Lawyer.findOne({ email });
-      if (existingLawyer) {
-        return res.status(400).json({ message: "Lawyer already registered" });
-      }
-  
-      // Hash password before saving
-      const hashedPassword = await bcrypt.hash(password, 10);
-  
-      // Create new lawyer with status 'pending'
-      const newLawyer = new Lawyer({
-        fullname,
-        email,
-        password: hashedPassword,  
-        phone,
-      });
-  
-      await newLawyer.save();
-  
-      const transporter = nodemailer.createTransport({
-        service: 'gmail',
-        auth: {
-          user: process.env.EMAIL_USER, // Email user (e.g., from .env)
-          pass: process.env.EMAIL_PASS, // Email password (from .env)
-        },
-      });
-  
-      const mailOptions = {
-        from: process.env.EMAIL_USER,
-        to: newLawyer.email,
-        subject: 'Welcome to PlotXpert - Registration Pending Approval',
-        text: `Dear ${newLawyer.fullname},
+  const {
+    fullname,
+    email,
+    password,
+    phone,
+    legal_office_name,
+    office_contact_number,
+    office_address,
+    bar_association_number,
+    identity_document_url,
+    years_of_experience,
+    area_of_specialization
+  } = req.body;
 
-Welcome to PlotXpert! 
+  try {
+    const existingLawyer = await Lawyer.findOne({ email });
+    if (existingLawyer) {
+      return res.status(400).json({ message: "Lawyer already registered" });
+    }
+
+    // Hash password before saving
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Create new lawyer with status 'pending'
+    const newLawyer = new Lawyer({
+      fullname,
+      email,
+      phone,
+      password: hashedPassword,
+      legal_office_name,
+      office_contact_number,
+      office_address,
+      bar_association_number,
+      identity_document_url,
+      years_of_experience,
+      area_of_specialization,
+    });
+
+    await newLawyer.save();
+
+    // Email setup
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: newLawyer.email,
+      subject: 'Welcome to PlotXpert - Registration Pending Approval',
+      text: `Dear ${newLawyer.fullname},
+
+Welcome to PlotXpert!
 
 We have received your registration request, and your account is currently under review. Our admin team will verify your details, and you will receive an approval notification once your account has been activated.
 
 What happens next?
 - Your account is being reviewed to ensure compliance with our legal service policies.
-- Approval typically takes 24-48 hours. 
+- Approval typically takes 24-48 hours.
 - Once approved, you will gain full access to our platform.
 
 Need Assistance?
@@ -60,26 +80,26 @@ Thank you for joining PlotXpert!
 
 Best regards,  
 The PlotXpert Team
-        `,
-      };
-  
-      transporter.sendMail(mailOptions, (err, info) => {
-        if (err) {
-          console.error("Error sending email:", err);
-        } else {
-          console.log("Email sent:", info.response);
-        }
-      });
-  
-      // Return success response
-      res.status(201).json({
-        newLawyer,
-        message: "Lawyer registered successfully. Pending approval."
-      });
-    } catch (error) {
-      res.status(500).json({ message: error.message });
-    }
-  };
+      `,
+    };
+
+    transporter.sendMail(mailOptions, (err, info) => {
+      if (err) {
+        console.error("Error sending email:", err);
+      } else {
+        console.log("Email sent:", info.response);
+      }
+    });
+
+    res.status(201).json({
+      newLawyer,
+      message: "Lawyer registered successfully. Pending approval."
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 
 exports.loginLawyer = async (req, res) => {
   const { email, password } = req.body;
