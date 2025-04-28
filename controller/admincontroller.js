@@ -1,7 +1,50 @@
 const bcrypt = require("bcryptjs");
 const Lawyer = require("../models/lawyer");
 const User = require("../models/user");
+const Admin = require("../models/admin");
 
+
+exports.adminResgister = async (req, res) => {
+  try{
+    const { fullname, email, password, phone } = req.body;
+    const existingAdmin = await Admin.find
+    ({ email });
+    if (existingAdmin) {
+      return res.status(400).json({ message: "Admin already exists" });
+    }
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const newAdmin = new Admin({
+      fullname,
+      email,
+      password: hashedPassword,
+      phone,
+    });
+    await newAdmin.save();
+
+  }catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+}
+exports.adminlogin=async (req, res)=>{
+  try{
+    const { email, password } = req.body;
+    const admin = await Admin.findOne({ email });
+    if (!admin) {
+      return res.status(400).json({ message: "Invalid email or password" });
+    }
+    const isMatch = await bcrypt.compare(password, admin.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: "Invalid email or password" });
+    }
+    const token = jwt.sign({ adminId: admin._id, role: 'admin' }, process.env.JWT_SECRET, { expiresIn: "1h" });
+    res.status(200).json({ token, admin });
+
+  }
+  catch(error){
+    res.status(500).json({ message: error.message });
+  }
+
+}
 exports.createLawyerRequest = async (req, res) => {
   try {
     const { fullname, email, password } = req.body;
