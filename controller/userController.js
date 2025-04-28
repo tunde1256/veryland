@@ -1,5 +1,7 @@
 const User = require("../models/user");
 const crypto = require('crypto'); // For generating a token
+const nodemailer = require("nodemailer");
+
 
 // Get user profile
 exports.getUserProfile = async (req, res) => {
