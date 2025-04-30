@@ -18,12 +18,18 @@ exports.registerLawyer = async (req, res) => {
     office_contact_number,
     office_address,
     bar_association_number,
-    identity_document_url,
     years_of_experience,
     area_of_specialization
   } = req.body;
 
+  // Check if the identity document (license) is uploaded, assuming Multer is used
+  const licenseFile = req.file ? `/uploads/ids/${req.file.filename}` : null;
+  if (!licenseFile) {
+    return res.status(400).json({ message: "License document is required." });
+  }
+
   try {
+    // Check if a lawyer with the same email already exists
     const existingLawyer = await Lawyer.findOne({ email });
     if (existingLawyer) {
       return res.status(400).json({ message: "Lawyer already registered" });
@@ -42,25 +48,29 @@ exports.registerLawyer = async (req, res) => {
       office_contact_number,
       office_address,
       bar_association_number,
-      identity_document_url,
+      identity_documents: {
+        license: licenseFile, // Store the license file URL
+      },
       years_of_experience,
       area_of_specialization,
+      status: 'pending', // Set status as 'pending'
     });
 
+    // Save the new lawyer in the database
     await newLawyer.save();
 
-    // Email setup
+    // Email setup using Nodemailer
     const transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
+        user: process.env.EMAIL_USER, // Your email
+        pass: process.env.EMAIL_PASS, // Your email password or app password
       },
     });
 
     const mailOptions = {
-      from: process.env.EMAIL_USER,
-      to: newLawyer.email,
+      from: process.env.EMAIL_USER, // Your email address
+      to: newLawyer.email, // Recipient's email
       subject: 'Welcome to PlotXpert - Registration Pending Approval',
       text: `Dear ${newLawyer.fullname},
 
@@ -73,8 +83,9 @@ What happens next?
 - Approval typically takes 24-48 hours.
 - Once approved, you will gain full access to our platform.
 
+**Important:** If you did not receive this email in your inbox, kindly check your spam or junk folder. Sometimes, emails from new contacts can end up there.
 Need Assistance?
-If you have any questions, feel free to reach out to our support team at ${process.env.SUPPORT_EMAIL}.
+If you have any questions, feel free to reach out to our support team at plotxpert@gmail.com.
 
 Thank you for joining PlotXpert!
 
@@ -83,6 +94,7 @@ The PlotXpert Team
       `,
     };
 
+    // Send the registration confirmation email
     transporter.sendMail(mailOptions, (err, info) => {
       if (err) {
         console.error("Error sending email:", err);
@@ -91,15 +103,16 @@ The PlotXpert Team
       }
     });
 
+    // Respond with success message
     res.status(201).json({
       newLawyer,
       message: "Lawyer registered successfully. Pending approval."
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("Error in registration:", error);
+    res.status(500).json({ message: "Server error: " + error.message });
   }
 };
-
 
 exports.loginLawyer = async (req, res) => {
   const { email, password } = req.body;

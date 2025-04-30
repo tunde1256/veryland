@@ -163,24 +163,30 @@ exports.resetPassword = async (req, res) => {
   try {
     const { email } = req.body;
 
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+
     const user = await User.findOne({ email });
 
     if (!user) {
       return res.status(404).json({ message: "No user found with that email" });
     }
 
-    // Generate a 6-digit numeric token
-    const resetToken = Math.floor(100000 + Math.random() * 900000).toString(); // Always 6 digits
+    // Generate a secure 6-digit numeric token using crypto
+    const buffer = crypto.randomBytes(4); // 4 bytes gives us up to ~4 billion
+    const randomNumber = buffer.readUInt32BE(0); // Read as a 32-bit unsigned integer
+    const resetToken = (randomNumber % 900000 + 100000).toString(); // Ensures it's between 100000–999999
 
-    // Set token and expiry
+    // Save token and expiry on user
     user.resetPasswordToken = resetToken;
-    user.resetPasswordExpires = Date.now() + 3600000; // Token valid for 1 hour
+    user.resetPasswordExpires = Date.now() + 3600000; // 1 hour validity
 
     await user.save();
 
-    // Send email
+    // Setup email transport
     const transporter = nodemailer.createTransport({
-      service: "gmail",
+      service: 'gmail',
       auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
@@ -188,11 +194,11 @@ exports.resetPassword = async (req, res) => {
     });
 
     const mailOptions = {
-      from: process.env.EMAIL_USER,
+      from: `"PlotXpert Support" <${process.env.EMAIL_USER}>`,
       to: user.email,
-      subject: "PlotXpert - Password Reset Code",
+      subject: 'PlotXpert - Password Reset Code',
       html: `
-        <p>Hello <strong>${user.fullname}</strong>,</p>
+        <p>Hello <strong>${user.fullname || 'User'}</strong>,</p>
         <p>You requested a password reset.</p>
         <p>Your password reset code is:</p>
         <h2 style="letter-spacing: 2px;">${resetToken}</h2>
@@ -202,55 +208,93 @@ exports.resetPassword = async (req, res) => {
       `,
     };
 
+    // Send email
     transporter.sendMail(mailOptions, (err, info) => {
       if (err) {
-        console.error("Error sending reset email:", err);
-      } else {
-        console.log("Reset email sent:", info.response);
+        console.error('Error sending reset email:', err);
+        return res.status(500).json({ message: 'Failed to send reset email' });
       }
+
+      console.log('Reset email sent:', info.response);
+      return res.status(200).json({ message: 'Reset code sent to email successfully' });
     });
 
-    res.status(200).json({ message: "Reset code sent to email successfully" });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('Reset password error:', error);
+    res.status(500).json({ message: 'Internal server error' });
   }
 };
-exports.completeResetPassword = async (req, res) => {
+
+exports.verifyResetToken = async (req, res) => {
   try {
-    const { email, resetToken, newPassword } = req.body;
+    const { resetToken } = req.body;
 
-    // Validate inputs
-    if (!email || !resetToken || !newPassword) {
-      return res.status(400).json({ message: "All fields are required" });
+    if (!resetToken) {
+      return res.status(400).json({ message: "Reset token is required" });
     }
 
-    if (newPassword.length < 6) {
-      return res.status(400).json({ message: "Password must be at least 6 characters long" });
-    }
-
-    // Find user by email and check if token matches and hasn't expired
     const user = await User.findOne({
-      email,
       resetPasswordToken: resetToken,
-      resetPasswordExpires: { $gt: Date.now() }, // Token not expired
+      resetPasswordExpires: { $gt: Date.now() },
     });
 
     if (!user) {
       return res.status(400).json({ message: "Invalid or expired reset token" });
     }
 
-    // Hash new password
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    // ✅ Set the session userId
+    req.session.userId = user._id;
 
-    // Update password and clear reset fields
+    res.status(200).json({ message: "Token is valid" });
+  } catch (error) {
+    console.error("Error verifying token:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+
+exports.completeResetPassword = async (req, res) => {
+  try {
+    const { newPassword, confirmPassword } = req.body;
+
+    if (!newPassword || !confirmPassword) {
+      return res.status(400).json({ message: "Both password fields are required" });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: "Password must be at least 6 characters long" });
+    }
+
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({ message: "Passwords do not match" });
+    }
+
+    const userId = req.session.userId;
+
+    if (!userId) {
+      return res.status(401).json({ message: "Session expired or invalid" });
+    }
+
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
     user.password = hashedPassword;
     user.resetPasswordToken = undefined;
     user.resetPasswordExpires = undefined;
 
     await user.save();
 
+    // Optional: clear the session
+    req.session.userId = null;
+
     res.status(200).json({ message: "Password reset successful" });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error("Password reset error:", error);
+    res.status(500).json({ message: "Server error" });
   }
 };
+

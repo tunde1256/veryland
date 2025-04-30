@@ -7,6 +7,8 @@ const mongoose = require("mongoose");
 const Message = require("./models/message");
 const db = require("./config/db");
 const stripeRoutes = require('./routes/stripeRoutes');
+const expressSession = require("express-session"); // Add this near the top
+
 
 // Connect to MongoDB
 db();
@@ -24,6 +26,18 @@ const corsOptions = {
 // Use CORS middleware with options
 app.use(cors(corsOptions));
 
+app.use(expressSession({
+    secret: process.env.SESSION_SECRET || 'keyboard_cat', // Use a strong secret in production
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      maxAge: 3600000, // 1 hour
+      secure: false,   // Set to true if you're using HTTPS
+      httpOnly: true,
+      sameSite: 'lax'
+    }
+  }));
+  
 // Middleware
 app.use(express.json());
 

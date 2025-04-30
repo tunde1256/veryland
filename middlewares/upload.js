@@ -1,18 +1,3 @@
-// const multer = require("multer");
-// const { CloudinaryStorage } = require("multer-storage-cloudinary");
-// const cloudinary = require("../config/cloudinary");
-
-
-// // Multer configuration to allow both images and documents
-// const storage = new CloudinaryStorage({
-//   cloudinary: cloudinary,
-//   params: {
-//     folder: "land-properties", // A folder specific to land/property uploads
-//     allowed_formats: ["jpg", "jpeg", "png", "pdf", "docx", "txt"], // Allowing images and documents
-//   },
-// });
-
-// const upload = multer({ storage });
 
 const multer = require("multer");
 const { CloudinaryStorage } = require("multer-storage-cloudinary");
@@ -56,6 +41,41 @@ const upload = multer({ storage });
 module.exports = upload;
 
 
+// const multer = require("multer");
+// const { CloudinaryStorage } = require("multer-storage-cloudinary");
+// const cloudinary = require("../config/cloudinary");
+
+// const storage = new CloudinaryStorage({
+//   cloudinary,
+//   params: (req, file) => {
+//     let folder = "land-properties";
+
+//     if (file.mimetype.startsWith("image/")) {
+//       folder += "/images";
+//     } else if (
+//       file.mimetype === "application/pdf" ||
+//       file.mimetype === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+//       file.mimetype === "text/plain"
+//     ) {
+//       folder += "/documents";
+//     } else {
+//       throw new Error("Invalid file type, only images and documents are allowed.");
+//     }
+
+//     const cleanName = file.originalname.split('.').slice(0, -1).join('.');
+
+//     return {
+//       folder,
+//       allowed_formats: ["jpg", "jpeg", "png", "pdf", "docx", "txt"],
+//       public_id: cleanName,
+//       access_mode: 'public',
+//       resource_type: file.mimetype.startsWith("image/") ? 'image' : 'auto',
+//     };
+//   },
+// });
+
+// const upload = multer({ storage });
+// module.exports = upload;
 
 
 
