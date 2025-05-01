@@ -119,8 +119,8 @@ exports.loginLawyer = async (req, res) => {
 
   try {
     const lawyer = await Lawyer.findOne({ email });
-    if (!lawyer || lawyer.status !== 'approved') {
-      return res.status(400).json({ message: "Invalid credentials or not approved yet" });
+    if (!lawyer) {
+      return res.status(400).json({ message: "Invalid credentials" });
     }
 
     const isMatch = await bcrypt.compare(password, lawyer.password);
