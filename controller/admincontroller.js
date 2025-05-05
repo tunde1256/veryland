@@ -2,29 +2,38 @@ const bcrypt = require("bcryptjs");
 const Lawyer = require("../models/lawyer");
 const User = require("../models/user");
 const Admin = require("../models/admin");
+const jwt = require("jsonwebtoken");
 
 
-exports.adminResgister = async (req, res) => {
-  try{
-    const { fullname, email, password, phone } = req.body;
-    const existingAdmin = await Admin.find
-    ({ email });
+exports.adminRegister = async (req, res) => {
+  try {
+  
+    const { fullname, email, password, phone,username } = req.body;
+
+    const existingAdmin = await Admin.findOne({ email });
     if (existingAdmin) {
       return res.status(400).json({ message: "Admin already exists" });
     }
+
     const hashedPassword = await bcrypt.hash(password, 10);
+
     const newAdmin = new Admin({
       fullname,
       email,
       password: hashedPassword,
       phone,
+      username,
+      isAdmin: true 
     });
+
     await newAdmin.save();
 
-  }catch (error) {
+    res.status(201).json({ message: "Admin created successfully", admin: newAdmin });
+  } catch (error) {
     res.status(500).json({ message: error.message });
   }
-}
+};
+
 exports.adminlogin=async (req, res)=>{
   try{
     const { email, password } = req.body;
