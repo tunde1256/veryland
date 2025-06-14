@@ -9,7 +9,7 @@ const {
   verifyPayment,
   getPaymentHistory,
   requestRefund,
-} = require("../controllers/paymentController.js");
+} = require("../controller/paymentController.js");
 
 const router = express.Router();
 

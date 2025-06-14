@@ -2,10 +2,10 @@
 const crypto = require("crypto");
 const { validationResult } = require("express-validator");
 const Payment = require("../models/payment.js");
-const Property = require("../models/Property.js");
+const Property = require("../models/property.js");
 const VerificationRequest = require("../models/Verification.js");
 const { paystackService } = require("../services/paymentGateway.js");
-const logger = require("../utils/logger.js");
+// const logger = require("../utils/logger.js");
 
 /**
  * Initialize payment for property verification

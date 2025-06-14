@@ -104,7 +104,7 @@ const PropertySchema = new mongoose.Schema(
 PropertySchema.index({ location: "2dsphere" });
 
 // Calculate verification fee before saving
-propertySchema.pre("save", function (next) {
+PropertySchema.pre("save", function (next) {
   if (
     this.isModified("price") ||
     this.isModified("verificationFee.percentage")

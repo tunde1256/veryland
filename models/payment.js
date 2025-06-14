@@ -1,84 +1,84 @@
-// models/Payment.js
-const mongoose = require("mongoose");
+// // models/Payment.js
+// const mongoose = require("mongoose");
 
-const paymentSchema = new mongoose.Schema(
-  {
-    reference: {
-      type: String,
-      required: true,
-      unique: true,
-    },
-    user: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-    },
-    property: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Property",
-      required: true,
-    },
-    amount: {
-      type: Number,
-      required: true,
-    },
-    currency: {
-      type: String,
-      default: "NGN",
-    },
-    paymentMethod: {
-      type: String,
-      enum: ["card", "bank_transfer", "ussd", "qr", "mobile_money"],
-      required: true,
-    },
-    gateway: {
-      type: String,
-      enum: ["paystack", "flutterwave", "interswitch"],
-      default: "paystack",
-    },
-    gatewayReference: String,
-    status: {
-      type: String,
-      enum: [
-        "pending",
-        "processing",
-        "success",
-        "failed",
-        "cancelled",
-        "refunded",
-      ],
-      default: "pending",
-    },
-    metadata: {
-      channel: String,
-      bank: String,
-      authorization: {
-        authorization_code: String,
-        bin: String,
-        last4: String,
-        exp_month: String,
-        exp_year: String,
-        channel: String,
-        card_type: String,
-        bank: String,
-        country_code: String,
-        brand: String,
-      },
-    },
-    paidAt: Date,
-    refundedAt: Date,
-    refundReason: String,
-    fees: {
-      gateway: Number,
-      platform: Number,
-    },
-  },
-  {
-    timestamps: true,
-  }
-);
+// const paymentSchema = new mongoose.Schema(
+//   {
+//     reference: {
+//       type: String,
+//       required: true,
+//       unique: true,
+//     },
+//     user: {
+//       type: mongoose.Schema.Types.ObjectId,
+//       ref: "User",
+//       required: true,
+//     },
+//     property: {
+//       type: mongoose.Schema.Types.ObjectId,
+//       ref: "Property",
+//       required: true,
+//     },
+//     amount: {
+//       type: Number,
+//       required: true,
+//     },
+//     currency: {
+//       type: String,
+//       default: "NGN",
+//     },
+//     paymentMethod: {
+//       type: String,
+//       enum: ["card", "bank_transfer", "ussd", "qr", "mobile_money"],
+//       required: true,
+//     },
+//     gateway: {
+//       type: String,
+//       enum: ["paystack", "flutterwave", "interswitch"],
+//       default: "paystack",
+//     },
+//     gatewayReference: String,
+//     status: {
+//       type: String,
+//       enum: [
+//         "pending",
+//         "processing",
+//         "success",
+//         "failed",
+//         "cancelled",
+//         "refunded",
+//       ],
+//       default: "pending",
+//     },
+//     metadata: {
+//       channel: String,
+//       bank: String,
+//       authorization: {
+//         authorization_code: String,
+//         bin: String,
+//         last4: String,
+//         exp_month: String,
+//         exp_year: String,
+//         channel: String,
+//         card_type: String,
+//         bank: String,
+//         country_code: String,
+//         brand: String,
+//       },
+//     },
+//     paidAt: Date,
+//     refundedAt: Date,
+//     refundReason: String,
+//     fees: {
+//       gateway: Number,
+//       platform: Number,
+//     },
+//   },
+//   {
+//     timestamps: true,
+//   }
+// );
 
-module.exports = mongoose.model("Payment", paymentSchema);
+// module.exports = mongoose.model("Payment", paymentSchema);
 
 // models/VerificationRequest.js
 const mongoose = require("mongoose");

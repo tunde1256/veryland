@@ -1,7 +1,7 @@
 // services/paymentGateway.js
 const axios = require("axios");
 const crypto = require("crypto");
-const logger = require("../utils/logger");
+// const logger = require("../utils/logger");
 
 class PaystackService {
   constructor() {
