@@ -1,41 +1,156 @@
-const mongoose = require('mongoose');
+// models/Payment.js
+const mongoose = require("mongoose");
 
-// Define a schema for payments
-const paymentSchema = new mongoose.Schema({
-    user_id: {
-        type: mongoose.Schema.Types.ObjectId, // Store the reference to the user who made the payment
-        required: true,
-        ref: 'User',  // Assuming you have a 'User' model for the user details
+const paymentSchema = new mongoose.Schema(
+  {
+    reference: {
+      type: String,
+      required: true,
+      unique: true,
+    },
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    property: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Property",
+      required: true,
     },
     amount: {
-        type: Number, // Amount in kobo (NGN)
-        required: true,
+      type: Number,
+      required: true,
     },
     currency: {
-        type: String,
-        default: 'ngn',  // Default currency is Naira (NGN)
+      type: String,
+      default: "NGN",
     },
-    payment_status: {
-        type: String,
-        enum: ['pending', 'succeeded', 'failed'], // Payment status
-        default: 'pending',
+    paymentMethod: {
+      type: String,
+      enum: ["card", "bank_transfer", "ussd", "qr", "mobile_money"],
+      required: true,
     },
-    stripe_payment_intent_id: {
-        type: String, // Stripe payment intent ID
-        required: true,
-        unique: true,  // Ensure the payment intent ID is unique
+    gateway: {
+      type: String,
+      enum: ["paystack", "flutterwave", "interswitch"],
+      default: "paystack",
     },
-    created_at: {
-        type: Date,
-        default: Date.now, // Automatically set the creation time
+    gatewayReference: String,
+    status: {
+      type: String,
+      enum: [
+        "pending",
+        "processing",
+        "success",
+        "failed",
+        "cancelled",
+        "refunded",
+      ],
+      default: "pending",
     },
-    updated_at: {
-        type: Date,
-        default: Date.now, // Automatically set the update time
+    metadata: {
+      channel: String,
+      bank: String,
+      authorization: {
+        authorization_code: String,
+        bin: String,
+        last4: String,
+        exp_month: String,
+        exp_year: String,
+        channel: String,
+        card_type: String,
+        bank: String,
+        country_code: String,
+        brand: String,
+      },
     },
-});
+    paidAt: Date,
+    refundedAt: Date,
+    refundReason: String,
+    fees: {
+      gateway: Number,
+      platform: Number,
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
 
-// Create the model for the Payment
-const Payment = mongoose.model('Payment', paymentSchema);
+module.exports = mongoose.model("Payment", paymentSchema);
 
-module.exports = Payment;
+// models/VerificationRequest.js
+const mongoose = require("mongoose");
+
+const verificationRequestSchema = new mongoose.Schema(
+  {
+    property: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Property",
+      required: true,
+    },
+    requestedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    payment: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Payment",
+      required: true,
+    },
+    assignedTo: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+    priority: {
+      type: String,
+      enum: ["low", "medium", "high", "urgent"],
+      default: "medium",
+    },
+    status: {
+      type: String,
+      enum: ["pending", "assigned", "in_progress", "completed", "cancelled"],
+      default: "pending",
+    },
+    scheduledDate: Date,
+    completedDate: Date,
+    report: {
+      documentVerification: {
+        status: String,
+        notes: String,
+      },
+      physicalInspection: {
+        status: String,
+        notes: String,
+        images: [String],
+      },
+      legalVerification: {
+        status: String,
+        notes: String,
+      },
+      overallRating: {
+        type: Number,
+        min: 1,
+        max: 5,
+      },
+      recommendations: String,
+      riskAssessment: {
+        level: {
+          type: String,
+          enum: ["low", "medium", "high"],
+        },
+        factors: [String],
+      },
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
+
+module.exports = mongoose.model(
+  "VerificationRequest",
+  verificationRequestSchema
+);
